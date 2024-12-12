@@ -2,9 +2,12 @@ package com.example.ocr_poc.utils
 
 import android.content.Context
 import android.util.Log
+import org.json.JSONObject
 import org.tensorflow.lite.Interpreter
+import java.io.BufferedReader
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -40,7 +43,11 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
             Log.d("TFLiteInterpreter", "Input Shape: ${inputShape.contentToString()}")
             Log.d("TFLiteInterpreter", "Output Shape: ${outputShape.contentToString()}")
         } catch (e: Exception) {
-            Log.e("TFLiteInterpreter", "Error retrieving model input/output shapes: ${e.message}", e)
+            Log.e(
+                "TFLiteInterpreter",
+                "Error retrieving model input/output shapes: ${e.message}",
+                e
+            )
             throw RuntimeException("Error retrieving model input/output shapes: ${e.message}")
         }
 
@@ -50,7 +57,11 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
         }
     }
 
-    fun predict(text: String, word2index: Map<String, Int>, index2tag: Map<Int, String>): Array<Pair<String, String>> {
+    fun predict(
+        text: String,
+        word2index: Map<String, Int>,
+        index2tag: Map<Int, String>
+    ): Array<Pair<String, String>> {
         Log.d("TFLiteInterpreter", "Starting prediction...")
 
         // Preprocess input text
@@ -72,14 +83,37 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
         return try {
             interpreter.run(inputBuffer, outputBuffer)
             Log.d("TFLiteInterpreter", "Inference completed.")
-            parseOutput(outputBuffer, tokens, index2tag)
+            val rawPredictions = parseOutput(outputBuffer, tokens, index2tag)
+            validatePredictions(rawPredictions)
         } catch (e: Exception) {
             Log.e("TFLiteInterpreter", "Inference error: ${e.message}", e)
             throw RuntimeException("Inference error: ${e.message}")
         }
     }
 
-    private fun preprocessText(text: String, word2index: Map<String, Int>): Pair<List<String>, IntArray> {
+    private fun validatePredictions(predictions: Array<Pair<String, String>>): Array<Pair<String, String>> {
+        return predictions.filter { (token, tag) ->
+            when (tag) {
+                "B-TOTAL", "I-TOTAL", "B-PRICE", "I-PRICE", "B-QUANTITY", "I-QUANTITY" -> token.isNumeric()
+                "B-NAME", "I-NAME" -> token.isName() // Add a custom check for names if needed
+                else -> true // Allow other tags without validation
+            }
+        }.toTypedArray()
+    }
+
+    private fun String.isNumeric(): Boolean {
+        return this.toDoubleOrNull() != null
+    }
+
+    private fun String.isName(): Boolean {
+        // Simple heuristic: Names are usually alphabetic and start with an uppercase letter
+        return this.matches(Regex("^[A-Z][a-zA-Z]+$"))
+    }
+
+    private fun preprocessText(
+        text: String,
+        word2index: Map<String, Int>
+    ): Pair<List<String>, IntArray> {
         val tokens = text.split("\\s+".toRegex())
         val tokenIndices = tokens.map { word2index[it] ?: word2index["--UNKNOWN_WORD--"]!! }
         val sequenceLength = inputShape[1]
@@ -93,7 +127,11 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
         return tokens to paddedSequence.toIntArray()
     }
 
-    private fun parseOutput(outputBuffer: ByteBuffer, tokens: List<String>, index2tag: Map<Int, String>): Array<Pair<String, String>> {
+    private fun parseOutput(
+        outputBuffer: ByteBuffer,
+        tokens: List<String>,
+        index2tag: Map<Int, String>
+    ): Array<Pair<String, String>> {
         val sequenceLength = outputShape[1]
         val numClasses = outputShape[2]
 

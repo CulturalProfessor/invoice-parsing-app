@@ -6,7 +6,6 @@ import android.net.Uri
 import android.util.Log
 import com.example.ocr_poc.models.TextEntity
 import com.google.mlkit.nl.entityextraction.Entity
-import com.google.mlkit.nl.entityextraction.EntityAnnotation
 import com.google.mlkit.nl.entityextraction.EntityExtraction
 import com.google.mlkit.nl.entityextraction.EntityExtractionParams
 import com.google.mlkit.nl.entityextraction.EntityExtractor
@@ -16,12 +15,8 @@ import com.google.mlkit.vision.text.TextRecognizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.math.abs
 
 class Extraction(private val context: Context) {
     private val index2tag = mapOf(
@@ -47,6 +42,7 @@ class Extraction(private val context: Context) {
         37 to "B-GST", 38 to "I-GST",
         39 to "B-TAX-COMPONENT", 40 to "I-TAX-COMPONENT"
     )
+
     suspend fun processImageForText(
         uri: Uri,
         textRecognizer: TextRecognizer,
@@ -68,29 +64,20 @@ class Extraction(private val context: Context) {
                     }
 
                     val ocrText = result.text
-                    val bilstmPredictions = runBiLSTMPredictions(ocrText, tfliteInterpreter, word2index)
                     val extractedEntities = mutableListOf<TextEntity>()
 
-                    // Add BiLSTM predictions
+                    val mlkitEntities = extractMLKitEntities(ocrText)
+                    extractedEntities.addAll(mlkitEntities)
+
+                    val bilstmPredictions =
+                        runBiLSTMPredictions(ocrText, tfliteInterpreter, word2index)
                     for ((token, tag) in bilstmPredictions) {
-                        if (tag != "O") { // Ignore non-entity tokens
+                        if (tag != "O" && !isMLKitTag(tag)) { // Avoid duplicating ML Kit tags
                             extractedEntities.add(TextEntity(label = tag, text = token))
                         }
                     }
 
-                    // Optionally, add rows of OCR text with no BiLSTM entities
-                    val rows = mutableMapOf<Int, MutableList<String>>()
-                    for (block in result.textBlocks) {
-                        for (line in block.lines) {
-                            val topValue = line.boundingBox?.top ?: continue
-                            rows.computeIfAbsent(topValue) { mutableListOf() }.add(line.text)
-                        }
-                    }
-                    for ((_, rowTexts) in rows) {
-                        extractedEntities.add(TextEntity(label = "OCR", text = rowTexts.joinToString(" ")))
-                    }
-
-                    extractedEntities
+                    combineEntitiesByTag(extractedEntities)
                 } catch (e: Exception) {
                     Log.e("MLKit OCR", "Text recognition failed: ${e.message}")
                     emptyList()
@@ -102,51 +89,70 @@ class Extraction(private val context: Context) {
         }
     }
 
-    private suspend fun extractEntitiesFromLine(lineText: String): List<EntityAnnotation> {
-        val entityExtractor: EntityExtractor? = try {
+    private fun combineEntitiesByTag(entities: List<TextEntity>): List<TextEntity> {
+        return entities.groupBy { it.label }.map { (label, groupedEntities) ->
+            TextEntity(
+                label = label,
+                text = groupedEntities.joinToString(" ") { it.text }
+            )
+        }
+    }
+
+    private suspend fun extractMLKitEntities(text: String): List<TextEntity> {
+        val entityExtractor = try {
             EntityExtraction.getClient(
                 EntityExtractorOptions.Builder(EntityExtractorOptions.ENGLISH).build()
             )
         } catch (e: Exception) {
-            Log.e("MLKit OCR", "Failed to initialize EntityExtractor: ${e.message}")
+            Log.e("MLKit Entity", "Failed to initialize EntityExtractor: ${e.message}")
             null
         }
 
-        if (entityExtractor == null) {
-            Log.e("MLKit OCR", "EntityExtractor initialization returned null.")
-            return emptyList()
-        }
+        if (entityExtractor == null) return emptyList()
 
         val isModelDownloaded = entityExtractor.isModelDownloaded().awaitResult()
         if (!isModelDownloaded) {
             try {
                 downloadModel(entityExtractor)
-                Log.d("MLKit OCR", "Model downloaded successfully.")
             } catch (e: Exception) {
-                Log.e("MLKit OCR", "Model download failed: ${e.message}")
+                Log.e("MLKit Entity", "Failed to download model: ${e.message}")
                 return emptyList()
             }
         }
 
         return suspendCancellableCoroutine { continuation ->
-            val params = EntityExtractionParams.Builder(lineText).build()
-            entityExtractor.annotate(params).addOnSuccessListener { entityAnnotations ->
-                    continuation.resume(entityAnnotations)
-                }.addOnFailureListener { e ->
-                    Log.e("MLKit OCR", "Entity extraction failed: ${e.message}")
+            val params = EntityExtractionParams.Builder(text).build()
+            entityExtractor.annotate(params)
+                .addOnSuccessListener { annotations ->
+                    val extractedEntities = annotations.flatMap { annotation ->
+                        annotation.entities.mapNotNull { entity ->
+                            val entityType = getEntityTypeName(entity)
+                            if (entityType != "UNKNOWN") {
+                                TextEntity(label = entityType, text = annotation.annotatedText)
+                            } else null
+                        }
+                    }
+                    continuation.resume(extractedEntities)
+                }
+                .addOnFailureListener { e ->
+                    Log.e("MLKit Entity", "Entity extraction failed: ${e.message}")
                     continuation.resumeWithException(e)
                 }
         }
     }
 
+    private fun isMLKitTag(tag: String): Boolean {
+        return tag in listOf("ADDRESS", "DATE_TIME", "EMAIL", "PHONE", "URL")
+    }
+
     private suspend fun downloadModel(entityExtractor: EntityExtractor) {
         return suspendCancellableCoroutine { continuation ->
             entityExtractor.downloadModelIfNeeded().addOnSuccessListener {
-                    continuation.resume(Unit)
-                }.addOnFailureListener { e ->
-                    Log.e("MLKit OCR", "Model download failed: ${e.message}")
-                    continuation.resumeWithException(e)
-                }
+                continuation.resume(Unit)
+            }.addOnFailureListener { e ->
+                Log.e("MLKit OCR", "Model download failed: ${e.message}")
+                continuation.resumeWithException(e)
+            }
         }
     }
 
