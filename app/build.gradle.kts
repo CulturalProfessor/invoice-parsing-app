@@ -68,4 +68,6 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation (libs.common)
     implementation(libs.firebase.analytics)
+    implementation (libs.tensorflow.lite.v2130)
+    implementation (libs.tensorflow.lite.support)
 }

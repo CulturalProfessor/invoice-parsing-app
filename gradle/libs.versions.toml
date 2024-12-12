@@ -14,7 +14,11 @@ activityCompose = "1.9.3"
 composeBom = "2024.04.01"
 playServicesMlkitDocumentScanner = "16.0.0-beta1"
 playServicesMlkitTextRecognition = "19.0.1"
+roomCompiler = "2.5.2"
+roomRuntime = "2.6.1"
 tensorflowLite = "2.9.0"
+tensorflowLiteSupport = "0.4.3"
+tensorflowLiteVersion = "2.13.0"
 textRecognition = "16.0.1"
 entityExtraction = "16.0.0-beta5"
 workRuntimeKtx = "2.10.0"
@@ -22,6 +26,9 @@ material = "1.12.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomRuntime" }
+androidx-room-compiler-v252 = { module = "androidx.room:room-compiler", version.ref = "roomCompiler" }
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 common = { module = "com.google.mlkit:common", version.ref = "common" }
@@ -44,6 +51,8 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 play-services-mlkit-document-scanner = { module = "com.google.android.gms:play-services-mlkit-document-scanner", version.ref = "playServicesMlkitDocumentScanner" }
 play-services-mlkit-text-recognition = { module = "com.google.android.gms:play-services-mlkit-text-recognition", version.ref = "playServicesMlkitTextRecognition" }
 tensorflow-lite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLite" }
+tensorflow-lite-support = { module = "org.tensorflow:tensorflow-lite-support", version.ref = "tensorflowLiteSupport" }
+tensorflow-lite-v2130 = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLiteVersion" }
 text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "textRecognition" }
 entity-extraction = { group = "com.google.mlkit", name = "entity-extraction", version.ref = "entityExtraction" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }

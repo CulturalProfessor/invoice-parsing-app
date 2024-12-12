@@ -1,0 +1,23 @@
+custom_tags = [
+    "O", 
+    "B-INVOICE", "I-INVOICE",
+    "B-DATE", "I-DATE",
+    "B-PO", "I-PO",
+    "B-VENDOR", "I-VENDOR",
+    "B-CUSTOMER", "I-CUSTOMER",
+    "B-ADDRESS", "I-ADDRESS",
+    "B-PHONE", "I-PHONE",
+    "B-EMAIL", "I-EMAIL",
+    "B-WEBSITE", "I-WEBSITE",
+    "B-ITEM", "I-ITEM",
+    "B-QUANTITY", "I-QUANTITY",
+    "B-PRICE", "I-PRICE",
+    "B-SUBTOTAL", "I-SUBTOTAL",
+    "B-TAX", "I-TAX",
+    "B-TOTAL", "I-TOTAL",
+    "B-PAYMENT", "I-PAYMENT",
+    "B-BANK", "I-BANK",
+    "B-NOTES", "I-NOTES",
+    "B-GST", "I-GST",
+    "B-TAX-COMPONENT", "I-TAX-COMPONENT"
+]
