@@ -1,6 +1,7 @@
 package com.example.ocr_poc
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -62,7 +63,6 @@ import java.io.InputStreamReader
 class MainActivity : ComponentActivity() {
     private lateinit var extraction: Extraction
     private var isTextExtracted by mutableStateOf(false)
-    private var recognizedText by mutableStateOf("")
     private lateinit var tfliteInterpreter: TFLiteInterpreter
     private lateinit var word2index: Map<String, Int>
 
@@ -125,8 +125,14 @@ class MainActivity : ComponentActivity() {
                                     )
                                     recognizedEntities = entities
                                     isTextExtracted = true
+
+                                    // Navigate to the EditTagsActivity
+                                    val intent = Intent(this@MainActivity, EditTagsActivity::class.java)
+                                    intent.putParcelableArrayListExtra("RECOGNIZED_ENTITIES", ArrayList(entities))
+                                    startActivity(intent)
                                 }
                             }
+
                         }
                     }
                 )
@@ -219,29 +225,29 @@ class MainActivity : ComponentActivity() {
 
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                Text(
-                                    "Recognized Text Entities:",
-                                    fontSize = 16.sp,
-                                    modifier = Modifier.padding(8.dp)
-                                )
+//                                Text(
+//                                    "Recognized Text Entities:",
+//                                    fontSize = 16.sp,
+//                                    modifier = Modifier.padding(8.dp)
+//                                )
                             }
 
-                            if (recognizedEntities.isNotEmpty()) {
-                                items(recognizedEntities) { entity ->
-                                    Text(
-                                        text = entity.label,
-                                        fontSize = 16.sp,
-                                        color = Color.Gray,
-                                        modifier = Modifier.padding(vertical = 4.dp)
-                                    )
-                                    Text(
-                                        text = entity.text,
-                                        fontSize = 14.sp,
-                                        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                }
-                            }
+//                            if (recognizedEntities.isNotEmpty()) {
+//                                items(recognizedEntities) { entity ->
+//                                    Text(
+//                                        text = entity.label,
+//                                        fontSize = 16.sp,
+//                                        color = Color.Gray,
+//                                        modifier = Modifier.padding(vertical = 4.dp)
+//                                    )
+//                                    Text(
+//                                        text = entity.text,
+//                                        fontSize = 14.sp,
+//                                        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+//                                    )
+//                                    Spacer(modifier = Modifier.height(4.dp))
+//                                }
+//                            }
 
                             if (isLoading) {
                                 item {

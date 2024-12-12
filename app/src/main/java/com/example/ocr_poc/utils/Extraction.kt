@@ -90,13 +90,22 @@ class Extraction(private val context: Context) {
     }
 
     private fun combineEntitiesByTag(entities: List<TextEntity>): List<TextEntity> {
-        return entities.groupBy { it.label }.map { (label, groupedEntities) ->
+        return entities.groupBy { simplifyTag(it.label) }.map { (label, groupedEntities) ->
             TextEntity(
                 label = label,
                 text = groupedEntities.joinToString(" ") { it.text }
             )
         }
     }
+
+    private fun simplifyTag(tag: String): String {
+        return if (tag.startsWith("B-") || tag.startsWith("I-")) {
+            tag.substring(2)
+        } else {
+            tag
+        }
+    }
+
 
     private suspend fun extractMLKitEntities(text: String): List<TextEntity> {
         val entityExtractor = try {

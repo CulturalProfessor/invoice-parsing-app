@@ -2,12 +2,9 @@ package com.example.ocr_poc.utils
 
 import android.content.Context
 import android.util.Log
-import org.json.JSONObject
 import org.tensorflow.lite.Interpreter
-import java.io.BufferedReader
 import java.io.FileNotFoundException
 import java.io.IOException
-import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
