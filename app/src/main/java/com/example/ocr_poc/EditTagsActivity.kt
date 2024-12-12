@@ -1,5 +1,6 @@
 package com.example.ocr_poc
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -34,6 +35,10 @@ class EditTagsActivity : ComponentActivity() {
         setContent {
             OCR_POCTheme {
                 EditTagsScreen(recognizedEntities) { updatedEntities ->
+                    val resultIntent = Intent().apply {
+                        putParcelableArrayListExtra("UPDATED_ENTITIES", ArrayList(updatedEntities))
+                    }
+                    setResult(RESULT_OK, resultIntent)
                     finish()
                 }
             }
