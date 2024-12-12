@@ -41,7 +41,12 @@ android {
 }
 
 dependencies {
-
+    // Necessary for BiLSTM
+    implementation("org.tensorflow:tensorflow-lite:2.12.0")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.12.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.3")
+    implementation ("com.fasterxml.jackson.core:jackson-databind:2.15.2")
+    implementation ("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -62,12 +67,9 @@ dependencies {
     implementation(libs.play.services.mlkit.document.scanner)
     implementation(libs.coil.compose)
     implementation(libs.text.recognition)
-    implementation(libs.tensorflow.lite)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.play.services.mlkit.text.recognition)
     implementation(platform(libs.firebase.bom))
     implementation (libs.common)
     implementation(libs.firebase.analytics)
-    implementation (libs.tensorflow.lite.v2130)
-    implementation (libs.tensorflow.lite.support)
 }

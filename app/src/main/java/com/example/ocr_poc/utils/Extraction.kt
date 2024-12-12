@@ -16,13 +16,43 @@ import com.google.mlkit.vision.text.TextRecognizer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.abs
 
 class Extraction(private val context: Context) {
-
-    suspend fun processImageForText(uri: Uri, textRecognizer: TextRecognizer): List<TextEntity> {
+    private val index2tag = mapOf(
+        0 to "O",
+        1 to "B-INVOICE", 2 to "I-INVOICE",
+        3 to "B-DATE", 4 to "I-DATE",
+        5 to "B-PO", 6 to "I-PO",
+        7 to "B-VENDOR", 8 to "I-VENDOR",
+        9 to "B-CUSTOMER", 10 to "I-CUSTOMER",
+        11 to "B-ADDRESS", 12 to "I-ADDRESS",
+        13 to "B-PHONE", 14 to "I-PHONE",
+        15 to "B-EMAIL", 16 to "I-EMAIL",
+        17 to "B-WEBSITE", 18 to "I-WEBSITE",
+        19 to "B-ITEM", 20 to "I-ITEM",
+        21 to "B-QUANTITY", 22 to "I-QUANTITY",
+        23 to "B-PRICE", 24 to "I-PRICE",
+        25 to "B-SUBTOTAL", 26 to "I-SUBTOTAL",
+        27 to "B-TAX", 28 to "I-TAX",
+        29 to "B-TOTAL", 30 to "I-TOTAL",
+        31 to "B-PAYMENT", 32 to "I-PAYMENT",
+        33 to "B-BANK", 34 to "I-BANK",
+        35 to "B-NOTES", 36 to "I-NOTES",
+        37 to "B-GST", 38 to "I-GST",
+        39 to "B-TAX-COMPONENT", 40 to "I-TAX-COMPONENT"
+    )
+    suspend fun processImageForText(
+        uri: Uri,
+        textRecognizer: TextRecognizer,
+        tfliteInterpreter: TFLiteInterpreter,
+        word2index: Map<String, Int>
+    ): List<TextEntity> {
         return withContext(Dispatchers.IO) {
             val inputStream = context.contentResolver.openInputStream(uri)
             val bitmap = BitmapFactory.decodeStream(inputStream)
@@ -37,58 +67,30 @@ class Extraction(private val context: Context) {
                         return@withContext emptyList()
                     }
 
-                    val tolerance = 5
-                    val rows: MutableMap<Int, MutableList<String>> = mutableMapOf()
+                    val ocrText = result.text
+                    val bilstmPredictions = runBiLSTMPredictions(ocrText, tfliteInterpreter, word2index)
+                    val extractedEntities = mutableListOf<TextEntity>()
 
+                    // Add BiLSTM predictions
+                    for ((token, tag) in bilstmPredictions) {
+                        if (tag != "O") { // Ignore non-entity tokens
+                            extractedEntities.add(TextEntity(label = tag, text = token))
+                        }
+                    }
+
+                    // Optionally, add rows of OCR text with no BiLSTM entities
+                    val rows = mutableMapOf<Int, MutableList<String>>()
                     for (block in result.textBlocks) {
                         for (line in block.lines) {
                             val topValue = line.boundingBox?.top ?: continue
-
-                            var foundRow: MutableList<String>? = null
-                            for ((rowTop, rowTexts) in rows) {
-                                if (abs(rowTop - topValue) <= tolerance) {
-                                    foundRow = rowTexts
-                                    break
-                                }
-                            }
-
-                            if (foundRow == null) {
-                                foundRow = mutableListOf()
-                                rows[topValue] = foundRow
-                            }
-
-                            foundRow.add(line.text)
+                            rows.computeIfAbsent(topValue) { mutableListOf() }.add(line.text)
                         }
                     }
-
-                    val extractedTextEntities = mutableListOf<TextEntity>()
                     for ((_, rowTexts) in rows) {
-                        val combinedRowText = rowTexts.joinToString(" ")
-
-                        val entities = extractEntitiesFromLine(combinedRowText)
-                        if (entities.isNotEmpty()) {
-                            val entityDescriptions = mutableListOf<String>()
-                            for (entityAnnotation in entities) {
-                                for (entity in entityAnnotation.entities) {
-                                    val entityType = getEntityTypeName(entity)
-                                    entityDescriptions.add("$entityType: ${entityAnnotation.annotatedText}")
-                                }
-                            }
-                            if (entityDescriptions.isNotEmpty()) {
-                                extractedTextEntities.add(
-                                    TextEntity(
-                                        label = "Entities found: ${entityDescriptions.joinToString(", ")}",
-                                        text = combinedRowText
-                                    )
-                                )
-                            }
-                        } else {
-                            // Add only the plain text when no entities are found
-                            extractedTextEntities.add(TextEntity("Text", combinedRowText))
-                        }
+                        extractedEntities.add(TextEntity(label = "OCR", text = rowTexts.joinToString(" ")))
                     }
 
-                    extractedTextEntities
+                    extractedEntities
                 } catch (e: Exception) {
                     Log.e("MLKit OCR", "Text recognition failed: ${e.message}")
                     emptyList()
@@ -145,6 +147,19 @@ class Extraction(private val context: Context) {
                     Log.e("MLKit OCR", "Model download failed: ${e.message}")
                     continuation.resumeWithException(e)
                 }
+        }
+    }
+
+    private fun runBiLSTMPredictions(
+        ocrText: String,
+        tfliteInterpreter: TFLiteInterpreter,
+        word2index: Map<String, Int>
+    ): Array<Pair<String, String>> {
+        return try {
+            tfliteInterpreter.predict(ocrText, word2index, index2tag)
+        } catch (e: Exception) {
+            Log.e("BiLSTM NER", "Prediction failed: ${e.message}")
+            emptyArray()
         }
     }
 

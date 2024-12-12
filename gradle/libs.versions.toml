@@ -4,6 +4,8 @@ coilCompose = "2.5.0"
 common = "18.11.0"
 entityExtractionVersion = "16.0.0-beta2"
 firebaseBom = "33.5.1"
+jacksonDatabind = "2.15.2"
+jacksonModuleKotlin = "2.15.2"
 kotlin = "2.0.0"
 coreKtx = "1.13.1"
 junit = "4.13.2"
@@ -17,8 +19,10 @@ playServicesMlkitTextRecognition = "19.0.1"
 roomCompiler = "2.5.2"
 roomRuntime = "2.6.1"
 tensorflowLite = "2.9.0"
+tensorflowLiteSelectTfOps = "2.12.0"
 tensorflowLiteSupport = "0.4.3"
 tensorflowLiteVersion = "2.13.0"
+tensorflowTensorflowLite = "2.12.0"
 textRecognition = "16.0.1"
 entityExtraction = "16.0.0-beta5"
 workRuntimeKtx = "2.10.0"
@@ -35,6 +39,8 @@ common = { module = "com.google.mlkit:common", version.ref = "common" }
 entity-extraction-v1600beta2 = { module = "com.google.mlkit:entity-extraction", version.ref = "entityExtractionVersion" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jacksonDatabind" }
+jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jacksonModuleKotlin" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -51,7 +57,9 @@ androidx-material3 = { group = "androidx.compose.material3", name = "material3" 
 play-services-mlkit-document-scanner = { module = "com.google.android.gms:play-services-mlkit-document-scanner", version.ref = "playServicesMlkitDocumentScanner" }
 play-services-mlkit-text-recognition = { module = "com.google.android.gms:play-services-mlkit-text-recognition", version.ref = "playServicesMlkitTextRecognition" }
 tensorflow-lite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLite" }
+tensorflow-lite-select-tf-ops = { module = "org.tensorflow:tensorflow-lite-select-tf-ops", version.ref = "tensorflowLiteSelectTfOps" }
 tensorflow-lite-support = { module = "org.tensorflow:tensorflow-lite-support", version.ref = "tensorflowLiteSupport" }
+tensorflow-lite-v2120 = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowTensorflowLite" }
 tensorflow-lite-v2130 = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLiteVersion" }
 text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "textRecognition" }
 entity-extraction = { group = "com.google.mlkit", name = "entity-extraction", version.ref = "entityExtraction" }

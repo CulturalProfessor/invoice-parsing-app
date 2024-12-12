@@ -1,7 +1,9 @@
 package com.example.ocr_poc
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -44,25 +46,43 @@ import coil.compose.AsyncImage
 import com.example.ocr_poc.models.TextEntity
 import com.example.ocr_poc.ui.theme.OCR_POCTheme
 import com.example.ocr_poc.utils.Extraction
+import com.example.ocr_poc.utils.TFLiteInterpreter
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStreamReader
 
 class MainActivity : ComponentActivity() {
     private lateinit var extraction: Extraction
     private var isTextExtracted by mutableStateOf(false)
     private var recognizedText by mutableStateOf("")
+    private lateinit var tfliteInterpreter: TFLiteInterpreter
+    private lateinit var word2index: Map<String, Int>
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        try {
+            word2index = loadWord2Index(this, "word2index.json")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to load word2index mapping: ${e.message}")
+            return
+        }
 
+        try {
+            tfliteInterpreter = TFLiteInterpreter(this, "bilstm_crf_ner.tflite")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to load model: ${e.message}")
+            return
+        }
         extraction = Extraction(applicationContext)
 
         val options = GmsDocumentScannerOptions.Builder()
@@ -99,7 +119,9 @@ class MainActivity : ComponentActivity() {
                                 if (imageUris.isNotEmpty()) {
                                     val entities = extraction.processImageForText(
                                         imageUris.last(),
-                                        textRecognizer
+                                        textRecognizer,
+                                        tfliteInterpreter,
+                                        word2index
                                     )
                                     recognizedEntities = entities
                                     isTextExtracted = true
@@ -232,5 +254,24 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun loadWord2Index(context: Context, fileName: String): Map<String, Int> {
+        val assetManager = context.assets
+        val inputStream = assetManager.open(fileName)
+        val bufferedReader = BufferedReader(InputStreamReader(inputStream))
+        val jsonString = bufferedReader.use { it.readText() }
+        val jsonObject = JSONObject(jsonString)
+
+        val word2index = mutableMapOf<String, Int>()
+        jsonObject.keys().forEach {
+            word2index[it] = jsonObject.getInt(it)
+        }
+        return word2index
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        tfliteInterpreter.close()
     }
 }
