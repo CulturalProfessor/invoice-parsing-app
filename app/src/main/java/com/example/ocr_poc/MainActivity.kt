@@ -54,6 +54,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStreamReader
 
+
 class MainActivity : ComponentActivity() {
     private lateinit var extraction: Extraction
     private var isTextExtracted by mutableStateOf(false)
