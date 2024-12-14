@@ -52,6 +52,8 @@ dependencies {
     implementation ("com.google.android.gms:play-services-vision:20.1.0")
     implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.6.0")
 
+
+
     implementation ("androidx.compose.material3:material3:1.1.0")
     implementation ("androidx.lifecycle:lifecycle-runtime-compose:2.6.1")
     implementation ("androidx.activity:activity-compose:1.7.2")

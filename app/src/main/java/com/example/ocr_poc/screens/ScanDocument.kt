@@ -137,38 +137,38 @@ fun ScanDocumentScreen(onBackClick: () -> Unit) {
 
    OCR_POCTheme {
        Scaffold(
-           topBar = {
-               TopAppBar(
-                   title = {
-                       Text(
-                           "Document Scanner",
-                           fontWeight = FontWeight.SemiBold,
-                           fontSize = 22.sp,
-                           modifier = Modifier.padding(horizontal = 30.dp, vertical = 10.dp) // Padding around text
-                       )
-                   },
-                   colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-
-                       containerColor = Color.Transparent, // No background color
-                       scrolledContainerColor = Color.Transparent, // Ensure transparency
-                       navigationIconContentColor = Color.Black
-
-                   ),
-
-                   navigationIcon = {
-                       IconButton(onClick = onBackClick) {
-                           Icon(
-                               imageVector = Icons.Filled.ArrowBack,
-                               contentDescription = "Back",
-                               tint = Color.Black
-                           )
-                       }
-                   },
-                   modifier = Modifier
-                       .height(50.dp), //custom height
-                           scrollBehavior = null
-               )
-           },
+//           topBar = {
+//               TopAppBar(
+//                   title = {
+//                       Text(
+//                           "Document Scanner",
+//                           fontWeight = FontWeight.SemiBold,
+//                           fontSize = 22.sp,
+//                           modifier = Modifier.padding(horizontal = 30.dp, vertical = 10.dp) // Padding around text
+//                       )
+//                   },
+//                   colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+//
+//                       containerColor = Color.Transparent, // No background color
+//                       scrolledContainerColor = Color.Transparent, // Ensure transparency
+//                       navigationIconContentColor = Color.Black
+//
+//                   ),
+//
+//                   navigationIcon = {
+//                       IconButton(onClick = onBackClick) {
+//                           Icon(
+//                               imageVector = Icons.Filled.ArrowBack,
+//                               contentDescription = "Back",
+//                               tint = Color.Black
+//                           )
+//                       }
+//                   },
+//                   modifier = Modifier
+//                       .height(50.dp), //custom height
+//                           scrollBehavior = null
+//               )
+//           },
            snackbarHost = { SnackbarHost(snackbarHostState) },
            content = { padding ->
                Box(
