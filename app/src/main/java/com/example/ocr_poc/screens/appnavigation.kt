@@ -11,9 +11,10 @@ import androidx.navigation.compose.rememberNavController
 fun AppNavigation() {
     val navController = rememberNavController()
 
-    NavHost(navController = navController, startDestination = "splash") {
+    NavHost(navController = navController, startDestination = "scroll_screen") {
         composable("splash") { SplashScreen(navController) }
         composable("main") { MainScreen(navController) }
+        composable("scroll_screen") { ScrollScreenWithTabs(  onBackClick = { navController.popBackStack()}) }
         composable("scan_document") {
             ScanDocumentScreen(
                 onBackClick = { navController.popBackStack() }
