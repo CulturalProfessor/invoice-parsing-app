@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.text.font.FontWeight
 import coil.compose.AsyncImage
 import com.example.ocr_poc.EditTagsActivity
 import com.example.ocr_poc.models.Invoice
@@ -177,11 +178,26 @@ fun InvoiceDetailDialog(invoice: Invoice, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-        title = { Text("Invoice Details") },
+        title = { Text("Invoice Details", style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)) },
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 invoice.entities.forEach { entity ->
-                    Text(text = "${entity.label}: ${entity.text}", modifier = Modifier.padding(4.dp))
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            text = entity.label, // Label Text
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            ),
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Text(
+                            text = entity.text, // Value Text
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color.DarkGray
+                            )
+                        )
+                    }
                 }
             }
         }
