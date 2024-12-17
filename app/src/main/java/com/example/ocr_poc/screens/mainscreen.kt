@@ -21,9 +21,7 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.TextUnit
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
+
 
 @Composable
 fun MainScreen(navController: NavController) {

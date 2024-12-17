@@ -26,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.graphics.Brush
 
+
 @Composable
 fun ScrollScreenWithTabs(onBackClick: () -> Unit) {
     val navController = rememberNavController()
@@ -131,8 +132,12 @@ fun ScrollScreenWithTabs(onBackClick: () -> Unit) {
                     tabs.forEach { tab ->
                         composable(tab.title) { // Use dynamic routes based on tab names
                             when (tab.title) {
-                                "Scan & Edit" -> ScanDocumentScreen(onBackClick = { navController.popBackStack() })
-                                "Past Invoices" -> MainScreen(navController)
+                                "Scan & Edit" -> ScanDocumentScreen(  onBackClick = {
+                                    navController.popBackStack() // Navigate back to the previous screen
+                                },
+                                    )
+//                                "Past Invoices" -> MainScreen(navController)
+                                "Past Invoices" -> InvoiceStorageScreen {  }
                                 else -> Text("Unknown tab") // Fallback for unexpected cases
                             }
                         }

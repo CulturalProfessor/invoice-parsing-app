@@ -16,8 +16,9 @@ fun AppNavigation() {
         composable("main") { MainScreen(navController) }
         composable("scroll_screen") { ScrollScreenWithTabs(  onBackClick = { navController.popBackStack()}) }
         composable("scan_document") {
-            ScanDocumentScreen(
-                onBackClick = { navController.popBackStack() }
+            ScanDocumentScreen(  onBackClick = {
+                navController.popBackStack() // Navigate back to the previous screen
+            },
             )
         }
     }
