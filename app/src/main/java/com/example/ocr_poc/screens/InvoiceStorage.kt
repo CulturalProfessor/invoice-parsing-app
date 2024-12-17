@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import coil.compose.AsyncImage
 import com.example.ocr_poc.EditTagsActivity
@@ -88,7 +89,15 @@ containerColor = Color.Transparent
                             shape = RoundedCornerShape(12.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                         ) {
-                            Box(modifier = Modifier.fillMaxWidth()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(Color(0xFF90CAF9), Color(0xFF1E88E5)) // New vibrant gradient
+                                        )
+                                    ))
+                          {
                                 // Invoice Content
                                 Row(
                                     modifier = Modifier
@@ -109,11 +118,13 @@ containerColor = Color.Transparent
                                     Column {
                                         Text(
                                             text = "Invoice ${index + 1}", // Dynamic title
-                                            style = MaterialTheme.typography.titleMedium
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                              color = Color.White
                                         )
                                         Text(
                                             text = "Total Items: ${invoice.entities.size}",
-                                            color = Color.Gray
+                                            color = Color.White
                                         )
                                     }
                                 }
@@ -139,7 +150,7 @@ containerColor = Color.Transparent
                                         Icon(
                                             Icons.Default.Edit,
                                             contentDescription = "Edit",
-                                            tint = Color(0xFF4CAF50),
+                                            tint =  Color(0xFFFFA726),
                                             modifier = Modifier.size(18.dp) // Adjust icon size
                                         )
                                     }
@@ -149,13 +160,13 @@ containerColor = Color.Transparent
                                             invoices.remove(invoice)
                                             InvoiceStorage.deleteInvoice(invoice)
                                         },
-                                        modifier = Modifier.size(24.dp) // Smaller icon
+                                        modifier = Modifier.size(25.dp) // Smaller icon
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
                                             contentDescription = "Delete",
                                             tint = Color.Red,
-                                            modifier = Modifier.size(18.dp) // Adjust icon size
+                                            modifier = Modifier.size(35.dp) // Adjust icon size
                                         )
                                     }
                                 }

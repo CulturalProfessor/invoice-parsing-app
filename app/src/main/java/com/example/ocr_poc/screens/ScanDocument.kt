@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -96,57 +97,85 @@ fun ScanDocumentScreen(onBackClick: () -> Unit) {
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        content = {
-                padding->    Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFFF5F5F5), Color(0xFFB0BEC5))
+        containerColor = Color.Transparent,
+        content = { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color(0xFF90CAF9), Color(0xFF1E88E5)) // New vibrant gradient
+                        )
                     )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .padding(padding),
+                contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.scanner),
-                    contentDescription = "Scanner Icon",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(120.dp)
-                )
-                Text(
-                    text = "Scan invoices to extract text",
-                    fontSize = 18.sp,
-                    color = Color(0xFF455A64),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 16.dp)
-                )
-                Button(
-                    onClick = {
-                        GmsDocumentScanning.getClient(
-                            GmsDocumentScannerOptions.Builder().build()
-                        ).getStartScanIntent(activity!!).addOnSuccessListener { intentSender ->
-                            scannerLauncher.launch(
-                                androidx.activity.result.IntentSenderRequest.Builder(
-                                    intentSender
-                                ).build()
-                            )
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
-                    modifier = Modifier
-                        .fillMaxWidth(0.8f)
-                        .padding(top = 8.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Text("Scan Document", color = Color.White, fontSize = 16.sp)
+                    // Scanner Icon with subtle rounded background
+                    Box(
+                        modifier = Modifier
+                            .size(140.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color.White.copy(alpha = 0.7f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.scanner),
+                            contentDescription = "Scanner Icon",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.size(100.dp)
+                        )
+                    }
+
+                    // Title Text
+                    Text(
+                        text = "Scan Invoices to Extract Text",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                    )
+
+                    // Subtitle Text
+                    Text(
+                        text = "Click below to start scanning your documents",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+
+                    // Scan Document Button with elevated styling
+                    Button(
+                        onClick = {
+                            GmsDocumentScanning.getClient(
+                                GmsDocumentScannerOptions.Builder().build()
+                            ).getStartScanIntent(activity!!).addOnSuccessListener { intentSender ->
+                                scannerLauncher.launch(
+                                    androidx.activity.result.IntentSenderRequest.Builder(
+                                        intentSender
+                                    ).build()
+                                )
+                            }
+                        },
+                        shape = RoundedCornerShape(30.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFA726)),
+                        elevation = ButtonDefaults.buttonElevation(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .height(50.dp)
+                    ) {
+                        Text(
+                            text = "Scan Document",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
-        }
         }
     )
 }

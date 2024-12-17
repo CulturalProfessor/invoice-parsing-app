@@ -82,7 +82,7 @@ fun ScrollScreenWithTabs(onBackClick: () -> Unit) {
                 // Rounded Tab Row
                 Row(
                     modifier = Modifier
-                        .padding(horizontal = 18.dp, vertical = 8.dp)
+//                        .padding(horizontal = 18.dp, vertical = 8.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFFF5F5F5))
                 ) {
@@ -136,7 +136,6 @@ fun ScrollScreenWithTabs(onBackClick: () -> Unit) {
                                     navController.popBackStack() // Navigate back to the previous screen
                                 },
                                     )
-//                                "Past Invoices" -> MainScreen(navController)
                                 "Past Invoices" -> InvoiceStorageScreen {  }
                                 else -> Text("Unknown tab") // Fallback for unexpected cases
                             }
