@@ -1,2 +1,4 @@
 /build
 google-services.json
+/.gradle
+gradle/caches/

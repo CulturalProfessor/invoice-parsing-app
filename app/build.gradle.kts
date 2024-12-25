@@ -63,11 +63,15 @@ dependencies {
     implementation ("androidx.lifecycle:lifecycle-runtime-compose:2.6.1")
     implementation ("androidx.activity:activity-compose:1.7.2")
     // Lottie dependencies for animations
-    implementation("com.airbnb.android:lottie:6.0.0") // Lottie animations
+    implementation(libs.lottie) // Lottie animations
     implementation("com.airbnb.android:lottie-compose:6.0.0") // Lottie for Compose
 
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.2")
+    implementation(libs.androidx.datastore.preferences)
+
+    implementation(libs.gson)
+    implementation(libs.datastore.preferences)
 
     // Necessary for BiLSTM
     implementation("org.tensorflow:tensorflow-lite:2.12.0")

@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.example.ocr_poc.screens
+
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.Image
@@ -27,6 +28,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.graphics.Brush
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScrollScreenWithTabs(onBackClick: () -> Unit) {
     val navController = rememberNavController()

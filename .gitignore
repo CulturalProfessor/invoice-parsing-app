@@ -2,3 +2,19 @@ app/src/main/assets/sroie2019v1.tflite
 local.properties
 .gradle
 /.gradle
+
+# Gradle cache and generated files
+.gradle/
+build/
+gradle/caches/
+gradle/daemon/
+gradle/native/
+gradle/wrapper/dists/
+gradle/lockfile
+gradle/gradle.properties
+*.log
+gradle/
+
+
+.idea/
+*.iml
