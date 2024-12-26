@@ -68,7 +68,7 @@ dependencies {
 
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.2")
-    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.datastore.preferences)
 
     implementation(libs.gson)
     implementation(libs.datastore.preferences)

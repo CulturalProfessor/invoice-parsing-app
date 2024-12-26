@@ -66,18 +66,27 @@ class Extraction(private val context: Context) {
                     val ocrText = result.text
                     val extractedEntities = mutableListOf<TextEntity>()
 
+                    // 1) Extract with MLKit
                     val mlkitEntities = extractMLKitEntities(ocrText)
                     extractedEntities.addAll(mlkitEntities)
 
+                    // 2) Predict with your BiLSTM model
                     val bilstmPredictions =
                         runBiLSTMPredictions(ocrText, tfliteInterpreter, word2index)
+
+                    // 3) Add predictions if tag != O and not a known MLKit tag
                     for ((token, tag) in bilstmPredictions) {
-                        if (tag != "O" && !isMLKitTag(tag)) { // Avoid duplicating ML Kit tags
+                        if (tag != "O" && !isMLKitTag(tag)) {
                             extractedEntities.add(TextEntity(label = tag, text = token))
                         }
                     }
 
-                    combineEntitiesByTag(extractedEntities)
+                    // 4) Combine model-entities by label, but keep MLKit entities separate
+                    val combined = combineEntitiesByTag(extractedEntities)
+
+                    // 5) Apply regex corrections for phone, pincode, etc.
+                    applyRegexCorrections(combined)
+
                 } catch (e: Exception) {
                     Log.e("MLKit OCR", "Text recognition failed: ${e.message}")
                     emptyList()
@@ -90,13 +99,47 @@ class Extraction(private val context: Context) {
     }
 
     private fun combineEntitiesByTag(entities: List<TextEntity>): List<TextEntity> {
-        return entities.groupBy { simplifyTag(it.label) }.map { (label, groupedEntities) ->
-            TextEntity(
-                label = label,
-                text = groupedEntities.joinToString(" ") { it.text }
-            )
+        val (mlKitEntities, modelEntities) = entities.partition { isMLKitTag(it.label) }
+
+        val combinedModelEntities = modelEntities
+            .groupBy { simplifyTag(it.label) }
+            .map { (label, groupedEntities) ->
+                TextEntity(
+                    label = label,
+                    text = groupedEntities.joinToString(" ") { it.text }
+                )
+            }
+
+        return mlKitEntities + combinedModelEntities
+    }
+
+    private fun applyRegexCorrections(entities: List<TextEntity>): List<TextEntity> {
+        val phoneRegex = Regex("""^\+?[0-9()\-\s]{7,15}$""")
+        val pinRegex = Regex("""^\d{5,6}$""")
+
+        // OLD: val decimalRegex = Regex("""^\d+(\.\d+)?$""")  // doesn't handle commas
+        // NEW: moneyRegex that handles commas
+        val moneyRegex = Regex("""^\d{1,3}(,\d{3})*(\.\d+)?$""")
+
+        return entities.map { entity ->
+            val trimmedText = entity.text.trim()
+            val correctedLabel = when {
+                // If it matches something like 3,099.00, it’s money
+                moneyRegex.matches(trimmedText) -> "MONEY"
+
+                phoneRegex.matches(trimmedText) -> "PHONE"
+                pinRegex.matches(trimmedText) -> "PINCODE"
+
+                // Optionally keep a simpler decimalRegex if you also want to catch
+                // numbers without commas:
+                // decimalRegex.matches(trimmedText) -> "DECIMAL"
+
+                else -> entity.label
+            }
+            entity.copy(label = correctedLabel)
         }
     }
+
 
     private fun simplifyTag(tag: String): String {
         return if (tag.startsWith("B-") || tag.startsWith("I-")) {
