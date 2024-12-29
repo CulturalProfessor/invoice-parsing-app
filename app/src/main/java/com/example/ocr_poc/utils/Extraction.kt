@@ -66,30 +66,25 @@ class Extraction(private val context: Context) {
                     val ocrText = result.text
                     val extractedEntities = mutableListOf<TextEntity>()
 
-                    // 1) Extract with MLKit
                     val mlkitEntities = extractMLKitEntities(ocrText)
                     extractedEntities.addAll(mlkitEntities)
 
-                    // 2) Predict with your BiLSTM model
                     val bilstmPredictions =
                         runBiLSTMPredictions(ocrText, tfliteInterpreter, word2index)
 
-                    // 3) Add predictions if tag != O and not a known MLKit tag
                     for ((token, tag) in bilstmPredictions) {
                         if (tag != "O" && !isMLKitTag(tag)) {
                             extractedEntities.add(TextEntity(label = tag, text = token))
                         }
                     }
 
-                    // 4) Combine model-entities by label, but keep MLKit entities separate
                     val combined = combineEntitiesByTag(extractedEntities)
 
-                    // 5) Apply regex corrections for phone, pincode, etc.
-                    applyRegexCorrections(combined)
+                    return@withContext applyRegexCorrections(combined)
 
                 } catch (e: Exception) {
                     Log.e("MLKit OCR", "Text recognition failed: ${e.message}")
-                    emptyList()
+                    return@withContext emptyList()
                 }
             } else {
                 Log.e("MLKit OCR", "Failed to load bitmap")
@@ -114,31 +109,42 @@ class Extraction(private val context: Context) {
     }
 
     private fun applyRegexCorrections(entities: List<TextEntity>): List<TextEntity> {
-        val phoneRegex = Regex("""^\+?[0-9()\-\s]{7,15}$""")
+        val phoneRegex = Regex("""^\+?[1-9][0-9]{1,3}[-.\s]?[0-9]{2,4}[-.\s]?[0-9]{4,6}$""")
+        val invalidPhoneRegex = Regex("""^\d+\.\d+\.\d+$""")
         val pinRegex = Regex("""^\d{5,6}$""")
 
-        // OLD: val decimalRegex = Regex("""^\d+(\.\d+)?$""")  // doesn't handle commas
-        // NEW: moneyRegex that handles commas
-        val moneyRegex = Regex("""^\d{1,3}(,\d{3})*(\.\d+)?$""")
-
-        return entities.map { entity ->
+        return entities.mapNotNull { entity ->
             val trimmedText = entity.text.trim()
+            val matchedPhone = phoneRegex.matches(trimmedText)
+            val excludedInvalidPhone = invalidPhoneRegex.matches(trimmedText)
+            val matchedPin = pinRegex.matches(trimmedText)
+
+            Log.d(
+                "Regex Debug",
+                "Text: '$trimmedText', PhoneMatch: $matchedPhone, InvalidPhoneMatch: $excludedInvalidPhone, PinMatch: $matchedPin"
+            )
+
+            // Skip invalid phone formats
+            if (excludedInvalidPhone) {
+                Log.d("Entity Correction", "Excluding invalid phone: $trimmedText")
+                return@mapNotNull null
+            }
+
             val correctedLabel = when {
-                // If it matches something like 3,099.00, it’s money
-                moneyRegex.matches(trimmedText) -> "MONEY"
-
-                phoneRegex.matches(trimmedText) -> "PHONE"
-                pinRegex.matches(trimmedText) -> "PINCODE"
-
-                // Optionally keep a simpler decimalRegex if you also want to catch
-                // numbers without commas:
-                // decimalRegex.matches(trimmedText) -> "DECIMAL"
-
+                matchedPhone -> "PHONE"
+                matchedPin -> "PINCODE"
                 else -> entity.label
             }
+
+            Log.d(
+                "Entity Correction",
+                "Original label: ${entity.label}, Corrected label: $correctedLabel for text: '$trimmedText'"
+            )
+
             entity.copy(label = correctedLabel)
         }
     }
+
 
 
     private fun simplifyTag(tag: String): String {
