@@ -64,6 +64,7 @@ class Extraction(private val context: Context) {
                     }
 
                     val ocrText = result.text
+                    Log.d("OCR Text :",ocrText)
                     val extractedEntities = mutableListOf<TextEntity>()
 
                     val mlkitEntities = extractMLKitEntities(ocrText)
@@ -79,7 +80,6 @@ class Extraction(private val context: Context) {
                     }
 
                     val combined = combineEntitiesByTag(extractedEntities)
-
                     return@withContext applyRegexCorrections(combined)
 
                 } catch (e: Exception) {
@@ -105,47 +105,65 @@ class Extraction(private val context: Context) {
                 )
             }
 
-        return mlKitEntities + combinedModelEntities
-    }
-
-    private fun applyRegexCorrections(entities: List<TextEntity>): List<TextEntity> {
-        val phoneRegex = Regex("""^\+?[1-9][0-9]{1,3}[-.\s]?[0-9]{2,4}[-.\s]?[0-9]{4,6}$""")
-        val invalidPhoneRegex = Regex("""^\d+\.\d+\.\d+$""")
-        val pinRegex = Regex("""^\d{5,6}$""")
-
-        return entities.mapNotNull { entity ->
-            val trimmedText = entity.text.trim()
-            val matchedPhone = phoneRegex.matches(trimmedText)
-            val excludedInvalidPhone = invalidPhoneRegex.matches(trimmedText)
-            val matchedPin = pinRegex.matches(trimmedText)
-
-            Log.d(
-                "Regex Debug",
-                "Text: '$trimmedText', PhoneMatch: $matchedPhone, InvalidPhoneMatch: $excludedInvalidPhone, PinMatch: $matchedPin"
+        val phoneEntities = entities.filter { it.label == "PHONE" }
+        val combinedPhoneEntity = if (phoneEntities.isNotEmpty()) {
+            TextEntity(
+                label = "PHONE",
+                text = phoneEntities.joinToString(", ") { it.text }
             )
+        } else null
 
-            // Skip invalid phone formats
-            if (excludedInvalidPhone) {
-                Log.d("Entity Correction", "Excluding invalid phone: $trimmedText")
-                return@mapNotNull null
-            }
-
-            val correctedLabel = when {
-                matchedPhone -> "PHONE"
-                matchedPin -> "PINCODE"
-                else -> entity.label
-            }
-
-            Log.d(
-                "Entity Correction",
-                "Original label: ${entity.label}, Corrected label: $correctedLabel for text: '$trimmedText'"
-            )
-
-            entity.copy(label = correctedLabel)
+        val finalEntities = mlKitEntities + combinedModelEntities
+        return if (combinedPhoneEntity != null) {
+            finalEntities + combinedPhoneEntity
+        } else {
+            finalEntities
         }
     }
 
+    private fun applyRegexCorrections(entities: List<TextEntity>): List<TextEntity> {
+        val phoneRegex = Regex(
+            """^(?!\d{1,2}[-/.\s]\d{1,2}[-/.\s]\d{2,4}$)(?!\d+(\.\d+)+$)(?!.*[^0-9+\-.])\+?[1-9]\d{1,3}[-.]?\d{2,4}[-.]?\d{4,6}$"""
+        )
+        val pinRegex = Regex("""^\d{5,6}$""")
+        return entities.mapNotNull { entity ->
+            val trimmedText = entity.text.trim()
+            val isPhoneMatch = phoneRegex.matches(trimmedText)
+            val isPinMatch = pinRegex.matches(trimmedText)
+            Log.d(
+                "Regex Debug",
+                "Text: '$trimmedText', PhoneMatch: $isPhoneMatch, PinMatch: $isPinMatch"
+            )
+            if (entity.label != "PHONE" && phoneRegex.containsMatchIn(trimmedText)) {
+                Log.d("Entity Correction", "Phone detected in non-PHONE entity: '$trimmedText'")
+                return@mapNotNull entity.copy(label = "PHONE")
+            }
+            when {
+                isPhoneMatch -> {
+                    Log.d("Entity Correction", "Valid PHONE detected: '$trimmedText'")
+                    entity.copy(label = "PHONE")
+                }
 
+                isPinMatch -> {
+                    Log.d("Entity Correction", "Valid PINCODE detected: '$trimmedText'")
+                    entity.copy(label = "PINCODE")
+                }
+
+                entity.label !in listOf("PHONE", "PINCODE") -> {
+                    Log.d(
+                        "Entity Retained",
+                        "Valid Non-Phone Entity: '${entity.label}' -> '$trimmedText'"
+                    )
+                    entity
+                }
+
+                else -> {
+                    Log.d("Entity Removal", "Invalid entity removed: '$trimmedText'")
+                    null
+                }
+            }
+        }
+    }
 
     private fun simplifyTag(tag: String): String {
         return if (tag.startsWith("B-") || tag.startsWith("I-")) {

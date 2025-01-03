@@ -48,7 +48,6 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
             throw RuntimeException("Error retrieving model input/output shapes: ${e.message}")
         }
 
-        // Shape validation
         if (inputShape.size != 2 || outputShape.size != 3) {
             throw IllegalStateException("Unexpected model input/output shapes. Input: ${inputShape.contentToString()}, Output: ${outputShape.contentToString()}")
         }
