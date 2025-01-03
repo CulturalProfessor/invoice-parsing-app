@@ -6,7 +6,9 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.graphics.Matrix
 import android.graphics.Paint
+import android.media.ExifInterface
 import android.net.Uri
 import android.util.Log
 import com.example.ocr_poc.models.TextEntity
@@ -26,44 +28,78 @@ import kotlin.math.abs
 
 
 class Extraction<Text>(private val context: Context) {
-    private val index2tag = mapOf(
-        0 to "O",
-        1 to "B-INVOICE", 2 to "I-INVOICE",
-        3 to "B-DATE", 4 to "I-DATE",
-        5 to "B-PO", 6 to "I-PO",
-        7 to "B-VENDOR", 8 to "I-VENDOR",
-        9 to "B-CUSTOMER", 10 to "I-CUSTOMER",
-        11 to "B-ADDRESS", 12 to "I-ADDRESS",
-        13 to "B-PHONE", 14 to "I-PHONE",
-        15 to "B-EMAIL", 16 to "I-EMAIL",
-        17 to "B-WEBSITE", 18 to "I-WEBSITE",
-        19 to "B-ITEM", 20 to "I-ITEM",
-        21 to "B-QUANTITY", 22 to "I-QUANTITY",
-        23 to "B-PRICE", 24 to "I-PRICE",
-        25 to "B-SUBTOTAL", 26 to "I-SUBTOTAL",
-        27 to "B-TAX", 28 to "I-TAX",
-        29 to "B-TOTAL", 30 to "I-TOTAL",
-        31 to "B-PAYMENT", 32 to "I-PAYMENT",
-        33 to "B-BANK", 34 to "I-BANK",
-        35 to "B-NOTES", 36 to "I-NOTES",
-        37 to "B-GST", 38 to "I-GST",
-        39 to "B-TAX-COMPONENT", 40 to "I-TAX-COMPONENT"
+    private val validTags = listOf(
+        "O",
+        "B-INVOICE", "I-INVOICE",
+        "B-DATE", "I-DATE",
+        "B-PO", "I-PO",
+        "B-VENDOR", "I-VENDOR",
+        "B-CUSTOMER", "I-CUSTOMER",
+        "B-ADDRESS", "I-ADDRESS",
+        "B-PHONE", "I-PHONE",
+        "B-EMAIL", "I-EMAIL",
+        "B-WEBSITE", "I-WEBSITE",
+        "B-ITEM", "I-ITEM",
+        "B-QUANTITY", "I-QUANTITY",
+        "B-PRICE", "I-PRICE",
+        "B-SUBTOTAL", "I-SUBTOTAL",
+        "B-TAX", "I-TAX",
+        "B-TOTAL", "I-TOTAL",
+        "B-PAYMENT", "I-PAYMENT",
+        "B-BANK", "I-BANK",
+        "B-NOTES", "I-NOTES",
+        "B-GST", "I-GST",
+        "B-TAX-COMPONENT", "I-TAX-COMPONENT"
     )
 
-    private fun toGrayscale(srcImage: Bitmap): Bitmap {
-        val bmpGrayscale =
-            Bitmap.createBitmap(srcImage.width, srcImage.height, Bitmap.Config.ARGB_8888)
+    private val index2tag = validTags.mapIndexed { index, tag -> index to tag }.toMap()
 
-        val canvas: Canvas = Canvas(bmpGrayscale)
-        val paint: Paint = Paint()
+    @Throws(java.lang.Exception::class)
+    private fun loadHighResBitmap(uri: Uri): Bitmap? {
+        val inputStream = context.contentResolver.openInputStream(uri)
+            ?: throw java.lang.Exception("Failed to open input stream")
 
-        val cm: ColorMatrix = ColorMatrix()
-        cm.setSaturation(0F)
-        paint.setColorFilter(ColorMatrixColorFilter(cm))
-        canvas.drawBitmap(srcImage, 0F, 0F, paint)
+        val options = BitmapFactory.Options()
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888
+        options.inScaled = false
 
+        val bitmap = BitmapFactory.decodeStream(inputStream, null, options)
+        inputStream.close()
+
+        return correctOrientation(uri, bitmap)
+    }
+
+    @Throws(java.lang.Exception::class)
+    private fun correctOrientation(uri: Uri, bitmap: Bitmap?): Bitmap? {
+        val inputStream = context.contentResolver.openInputStream(uri)
+            ?: throw java.lang.Exception("Failed to open input stream for EXIF data")
+
+        val exif: ExifInterface = ExifInterface(inputStream)
+        val orientation: Int =
+            exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+
+        val matrix: Matrix = Matrix()
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90F)
+            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180F)
+            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270F)
+            else -> return bitmap
+        }
+
+        return Bitmap.createBitmap(bitmap!!, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
+    private fun toHighQualityGrayscale(src: Bitmap): Bitmap {
+        val bmpGrayscale = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmpGrayscale)
+        val paint = Paint()
+        val colorMatrix = ColorMatrix()
+        colorMatrix.setSaturation(0f)
+        paint.setColorFilter(ColorMatrixColorFilter(colorMatrix))
+        canvas.drawBitmap(src, 0f, 0f, paint)
         return bmpGrayscale
     }
+
 
     suspend fun processImageForText(
         uri: Uri,
@@ -73,12 +109,13 @@ class Extraction<Text>(private val context: Context) {
     ): List<TextEntity> {
         return withContext(Dispatchers.IO) {
             val inputStream = context.contentResolver.openInputStream(uri)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
+            val bitmap = loadHighResBitmap(uri)
             inputStream?.close()
 
             if (bitmap != null) {
-                val grayscaleBitmap = toGrayscale(bitmap)
+                val grayscaleBitmap = toHighQualityGrayscale(bitmap)
                 val image = InputImage.fromBitmap(grayscaleBitmap, 0)
+
                 try {
                     val result = textRecognizer.process(image).awaitResult()
                     if (result == null || result.textBlocks.isEmpty()) {
@@ -96,11 +133,19 @@ class Extraction<Text>(private val context: Context) {
                     val bilstmPredictions =
                         runBiLSTMPredictions(formattedText, tfliteInterpreter, word2index)
 
+
                     for ((token, tag) in bilstmPredictions) {
                         if (tag != "O") {
                             extractedEntities.add(TextEntity(label = tag, text = token))
                         }
                     }
+                    // adding gstin even if it is not detected by bilstm
+                    val missingTags =
+                        listOf("B-TAX", "B-GST", "B-GSTIN")
+
+                    val proximityEntities = proximityEntities(formattedText, missingTags)
+                    extractedEntities.addAll(proximityEntities)
+
                     val combined = combineEntitiesByTag(extractedEntities)
 
                     return@withContext applyRegexCorrections(combined)
@@ -116,8 +161,43 @@ class Extraction<Text>(private val context: Context) {
         }
     }
 
+    private fun proximityEntities(
+        formattedText: String,
+        missingTags: List<String>
+    ): List<TextEntity> {
+        // if an entity exists in the list of valid tags by logical invoice layout the next entity should be tag's value
+        // for example there is B-DATE tag in the list of valid tags and if any substring of the formatted text contains simplified tag DATE then the next entity should be the value of the date similar for other tags
+        val lines = formattedText.split("\n")
+        val entities = mutableListOf<TextEntity>()
+
+        for (i in lines.indices) {
+            val line = lines[i]
+
+            // Check if the line contains any valid tag
+            for (tag in missingTags) {
+                var valueLine: String? = null
+                if (line.contains(
+                        tag.removePrefix("B-").removePrefix("I-"),
+                        ignoreCase = true
+                    )
+                ) {
+                    // Get the next non substring separated by space or after : as the value
+                    valueLine = lines.getOrNull(i + 1)?.split(":", limit = 2)?.getOrNull(1)?.trim()
+                }
+
+                if (!valueLine.isNullOrEmpty()) {
+                    // Add the entity to the list
+                    entities.add(TextEntity(label = simplifyTag(tag), text = valueLine))
+                }
+            }
+        }
+
+        return entities
+    }
+
+
     private fun formatTextWithBoundingBoxes(result: com.google.mlkit.vision.text.Text): String {
-        val tolerance = 10  // Tolerance for grouping lines into rows
+        val tolerance = 15  // Tolerance for grouping lines into rows
         val rows = mutableMapOf<Int, MutableList<String>>()
 
         for (block in result.textBlocks) {
@@ -145,9 +225,7 @@ class Extraction<Text>(private val context: Context) {
 
 
     private fun combineEntitiesByTag(entities: List<TextEntity>): List<TextEntity> {
-        val (mlKitEntities, modelEntities) = entities.partition { isMLKitTag(it.label) }
-
-        val combinedModelEntities = modelEntities
+        val combinedEntities = entities
             .groupBy { simplifyTag(it.label) }
             .map { (label, groupedEntities) ->
                 TextEntity(
@@ -156,25 +234,51 @@ class Extraction<Text>(private val context: Context) {
                 )
             }
 
-        val phoneEntities = entities.filter { it.label == "PHONE" }
-        val combinedPhoneEntity = if (phoneEntities.isNotEmpty()) {
-            TextEntity(
-                label = "PHONE",
-                text = phoneEntities.joinToString(", ") { it.text }
-            )
-        } else null
-
-        val finalEntities = mlKitEntities + combinedModelEntities
-        return if (combinedPhoneEntity != null) {
-            finalEntities + combinedPhoneEntity
-        } else {
-            finalEntities
-        }
+        return combinedEntities
     }
 
+
     private fun applyRegexCorrections(entities: List<TextEntity>): List<TextEntity> {
-        // Need to apply regex corrections to the extracted entities
-        return entities
+        // Define regex patterns for various entities
+        val urlRegex = Regex("https?://[\\w.-]+(?:\\.[\\w\\.-]+)+[/\\w\\._%+-]*") // Matches URLs
+        val emailRegex =
+            Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}") // Matches email addresses
+        val phoneRegex = Regex("""\b(?:\+?91|0)?[6789]\d{9}\b""") // Matches Indian phone numbers
+        val dateRegex =
+            Regex("\\b\\d{2}[\\/-]\\d{2}[\\/-]\\d{4}\\b") // Matches dates in DD/MM/YYYY or DD-MM-YYYY
+        val amountRegex = Regex("\\b\\d+\\.\\d{2}\\b") // Matches amounts with two decimal places
+        val gstTaxRegex = Regex("\\b[0-9A-Z]{15}\\b") // Matches GSTIN format
+        val invoiceRegex = Regex("\\b\\d{4,}\\b") // Matches invoices with 4+ digits
+        val customerRegex = Regex("\\b[A-Z][a-z]+\\b") // Matches capitalized words
+        val quantityRegex = Regex("\\b\\d{1,2}\\b") // Matches quantities of 1-2 digits
+
+        return entities.mapNotNull { entity ->
+            val matchedValues = when (simplifyTag(entity.label)) {
+                "URL" -> urlRegex.findAll(entity.text).joinToString(", ") { it.value }
+                "EMAIL" -> emailRegex.findAll(entity.text).joinToString(", ") { it.value }
+                "PHONE" -> phoneRegex.findAll(entity.text).joinToString(", ") { it.value }
+                "DATE" -> dateRegex.findAll(entity.text).joinToString(", ") { it.value }
+                "TOTAL", "SUBTOTAL" -> amountRegex.findAll(entity.text)
+                    .joinToString(", ") { it.value }
+
+                "TAX", "GST", "GSTIN" -> gstTaxRegex.findAll(entity.text)
+                    .joinToString(", ") { it.value }
+
+                "INVOICE" -> invoiceRegex.findAll(entity.text).joinToString(", ") { it.value }
+                "CUSTOMER", "VENDOR" -> customerRegex.findAll(entity.text)
+                    .joinToString(", ") { it.value }
+
+                "QUANTITY" -> quantityRegex.findAll(entity.text).joinToString(", ") { it.value }
+                else -> entity.text // Fallback: Use original text
+            }
+
+            // Return updated entity only if matches are found
+            if (matchedValues.isNotBlank()) {
+                entity.copy(text = matchedValues)
+            } else {
+                null
+            }
+        }
     }
 
     private fun simplifyTag(tag: String): String {
