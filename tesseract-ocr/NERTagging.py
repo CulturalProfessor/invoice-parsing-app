@@ -163,7 +163,7 @@ def preprocess_csv(csv_path):
 def process():
     input_csv_paths = [
         "./extracted_texts.csv",
-        "./extracted_data/extracted_text_2024-11-25 00:44:32.590724.csv",
+        "./extracted_data/extracted_text_2025-01-03 20:17:02.584792.csv",
     ]
     output_csv_path = "./tagged_output.csv"
     with open(output_csv_path, "w", encoding="utf-8", newline="") as outfile:

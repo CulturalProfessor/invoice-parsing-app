@@ -1,7 +1,12 @@
 package com.example.ocr_poc.utils
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.net.Uri
 import android.util.Log
 import com.example.ocr_poc.models.TextEntity
@@ -17,8 +22,10 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.abs
 
-class Extraction(private val context: Context) {
+
+class Extraction<Text>(private val context: Context) {
     private val index2tag = mapOf(
         0 to "O",
         1 to "B-INVOICE", 2 to "I-INVOICE",
@@ -43,6 +50,21 @@ class Extraction(private val context: Context) {
         39 to "B-TAX-COMPONENT", 40 to "I-TAX-COMPONENT"
     )
 
+    private fun toGrayscale(srcImage: Bitmap): Bitmap {
+        val bmpGrayscale =
+            Bitmap.createBitmap(srcImage.width, srcImage.height, Bitmap.Config.ARGB_8888)
+
+        val canvas: Canvas = Canvas(bmpGrayscale)
+        val paint: Paint = Paint()
+
+        val cm: ColorMatrix = ColorMatrix()
+        cm.setSaturation(0F)
+        paint.setColorFilter(ColorMatrixColorFilter(cm))
+        canvas.drawBitmap(srcImage, 0F, 0F, paint)
+
+        return bmpGrayscale
+    }
+
     suspend fun processImageForText(
         uri: Uri,
         textRecognizer: TextRecognizer,
@@ -55,7 +77,8 @@ class Extraction(private val context: Context) {
             inputStream?.close()
 
             if (bitmap != null) {
-                val image = InputImage.fromBitmap(bitmap, 0)
+                val grayscaleBitmap = toGrayscale(bitmap)
+                val image = InputImage.fromBitmap(grayscaleBitmap, 0)
                 try {
                     val result = textRecognizer.process(image).awaitResult()
                     if (result == null || result.textBlocks.isEmpty()) {
@@ -63,23 +86,23 @@ class Extraction(private val context: Context) {
                         return@withContext emptyList()
                     }
 
-                    val ocrText = result.text
-                    Log.d("OCR Text :",ocrText)
+                    // Format OCR text using bounding boxes
+                    val formattedText = formatTextWithBoundingBoxes(result)
+                    Log.d("Formatted OCR Text", formattedText)
+
                     val extractedEntities = mutableListOf<TextEntity>()
-
-                    val mlkitEntities = extractMLKitEntities(ocrText)
+                    val mlkitEntities = extractMLKitEntities(formattedText)
                     extractedEntities.addAll(mlkitEntities)
-
                     val bilstmPredictions =
-                        runBiLSTMPredictions(ocrText, tfliteInterpreter, word2index)
+                        runBiLSTMPredictions(formattedText, tfliteInterpreter, word2index)
 
                     for ((token, tag) in bilstmPredictions) {
-                        if (tag != "O" && !isMLKitTag(tag)) {
+                        if (tag != "O") {
                             extractedEntities.add(TextEntity(label = tag, text = token))
                         }
                     }
-
                     val combined = combineEntitiesByTag(extractedEntities)
+
                     return@withContext applyRegexCorrections(combined)
 
                 } catch (e: Exception) {
@@ -92,6 +115,34 @@ class Extraction(private val context: Context) {
             }
         }
     }
+
+    private fun formatTextWithBoundingBoxes(result: com.google.mlkit.vision.text.Text): String {
+        val tolerance = 10  // Tolerance for grouping lines into rows
+        val rows = mutableMapOf<Int, MutableList<String>>()
+
+        for (block in result.textBlocks) {
+            for (line in block.lines) {
+                val topPosition = line.boundingBox?.top ?: 0
+
+                // Check if the line fits within an existing row's tolerance range
+                val existingRowKey = rows.keys.find { abs(it - topPosition) <= tolerance }
+
+                if (existingRowKey != null) {
+                    // Add text to the existing row
+                    rows[existingRowKey]?.add(line.text)
+                } else {
+                    // Create a new row if no suitable row is found
+                    rows[topPosition] = mutableListOf(line.text)
+                }
+            }
+        }
+
+        // Sort rows by top position and join the texts to form complete rows
+        return rows.entries
+            .sortedBy { it.key }
+            .joinToString("\n") { (_, texts) -> texts.joinToString(" ") }
+    }
+
 
     private fun combineEntitiesByTag(entities: List<TextEntity>): List<TextEntity> {
         val (mlKitEntities, modelEntities) = entities.partition { isMLKitTag(it.label) }
@@ -122,47 +173,8 @@ class Extraction(private val context: Context) {
     }
 
     private fun applyRegexCorrections(entities: List<TextEntity>): List<TextEntity> {
-        val phoneRegex = Regex(
-            """^(?!\d{1,2}[-/.\s]\d{1,2}[-/.\s]\d{2,4}$)(?!\d+(\.\d+)+$)(?!.*[^0-9+\-.])\+?[1-9]\d{1,3}[-.]?\d{2,4}[-.]?\d{4,6}$"""
-        )
-        val pinRegex = Regex("""^\d{5,6}$""")
-        return entities.mapNotNull { entity ->
-            val trimmedText = entity.text.trim()
-            val isPhoneMatch = phoneRegex.matches(trimmedText)
-            val isPinMatch = pinRegex.matches(trimmedText)
-            Log.d(
-                "Regex Debug",
-                "Text: '$trimmedText', PhoneMatch: $isPhoneMatch, PinMatch: $isPinMatch"
-            )
-            if (entity.label != "PHONE" && phoneRegex.containsMatchIn(trimmedText)) {
-                Log.d("Entity Correction", "Phone detected in non-PHONE entity: '$trimmedText'")
-                return@mapNotNull entity.copy(label = "PHONE")
-            }
-            when {
-                isPhoneMatch -> {
-                    Log.d("Entity Correction", "Valid PHONE detected: '$trimmedText'")
-                    entity.copy(label = "PHONE")
-                }
-
-                isPinMatch -> {
-                    Log.d("Entity Correction", "Valid PINCODE detected: '$trimmedText'")
-                    entity.copy(label = "PINCODE")
-                }
-
-                entity.label !in listOf("PHONE", "PINCODE") -> {
-                    Log.d(
-                        "Entity Retained",
-                        "Valid Non-Phone Entity: '${entity.label}' -> '$trimmedText'"
-                    )
-                    entity
-                }
-
-                else -> {
-                    Log.d("Entity Removal", "Invalid entity removed: '$trimmedText'")
-                    null
-                }
-            }
-        }
+        // Need to apply regex corrections to the extracted entities
+        return entities
     }
 
     private fun simplifyTag(tag: String): String {

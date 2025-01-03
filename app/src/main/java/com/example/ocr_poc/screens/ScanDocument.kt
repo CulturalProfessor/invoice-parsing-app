@@ -47,7 +47,7 @@ fun ScanDocumentScreen(onBackClick: () -> Unit) {
     val coroutineScope = rememberCoroutineScope() // Coroutine scope for Compose
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val extraction = remember { Extraction(context) }
+    val extraction = remember { Extraction<Any>(context) }
 
     val word2index = loadWord2Index(context, "word2index.json")
     val tfliteInterpreter = TFLiteInterpreter(context, "bilstm_crf_ner.tflite")
