@@ -151,11 +151,11 @@ class Extraction<Text>(private val context: Context) {
 
                     val extractedEntities = mutableListOf<TextEntity>()
                     val mlkitEntities = extractMLKitEntities(formattedText)
-                    Log.d("MLKit Entities", mlkitEntities.joinToString("\n"))
+                    Log.d("MLKit Entities", mlkitEntities.toString())
                     extractedEntities.addAll(mlkitEntities)
                     val bilstmPredictions =
                         runBiLSTMPredictions(formattedText, tfliteInterpreter, word2index)
-                    Log.d("BiLSTM Predictions", bilstmPredictions.joinToString("\n"))
+                    Log.d("BiLSTM Predictions", bilstmPredictions.contentToString())
                     for ((token, tag) in bilstmPredictions) {
                         if (tag != "O") {
                             extractedEntities.add(TextEntity(label = tag, text = token))
@@ -163,7 +163,12 @@ class Extraction<Text>(private val context: Context) {
                     }
                     // adding gstin even if it is not detected by bilstm
                     val missingTags =
-                        listOf("B-TAX", "B-GST", "B-GSTIN")
+                        listOf(
+                            "B-TAX",
+                            "B-GST",
+                            "B-GSTIN",
+                            "B-INVOICE",
+                        )
 
                     val proximityEntities = proximityEntities(formattedText, missingTags)
                     extractedEntities.addAll(proximityEntities)
@@ -187,36 +192,42 @@ class Extraction<Text>(private val context: Context) {
         formattedText: String,
         missingTags: List<String>
     ): List<TextEntity> {
-        // if an entity exists in the list of valid tags by logical invoice layout the next entity should be tag's value
-        // for example there is B-DATE tag in the list of valid tags and if any substring of the formatted text contains simplified tag DATE then the next entity should be the value of the date similar for other tags
         val lines = formattedText.split("\n")
         val entities = mutableListOf<TextEntity>()
 
         for (i in lines.indices) {
             val line = lines[i]
 
-            // Check if the line contains any valid tag
             for (tag in missingTags) {
+                val simplifiedTag = simplifyTag(tag)
                 var valueLine: String? = null
-                if (line.contains(
-                        tag.removePrefix("B-").removePrefix("I-"),
-                        ignoreCase = true
-                    )
-                ) {
-                    // Get the next non substring separated by space or after : as the value
-                    valueLine = lines.getOrNull(i + 1)?.split(":", limit = 2)?.getOrNull(1)?.trim()
+
+                if (line.contains(simplifiedTag, ignoreCase = true)) {
+                    if (simplifiedTag == "INVOICE") {
+                        // Special handling for "INVOICE NO" variations
+                        valueLine =
+                            Regex("(?i)INVOICE\\s+No\\.?\\s*:?\\s*(\\S+)").find(line)?.groupValues?.get(
+                                1
+                            )?.trim()
+                    } else {
+                        // General fallback for other tags
+                        valueLine =
+                            lines.getOrNull(i + 1)?.split(":", limit = 2)?.getOrNull(1)?.trim()
+                                ?: lines.getOrNull(i + 1)?.trim()
+                    }
                 }
 
                 if (!valueLine.isNullOrEmpty()) {
-                    // Add the entity to the list
-                    entities.add(TextEntity(label = simplifyTag(tag), text = valueLine))
+                    // Extract only the first token (before the first space)
+                    valueLine = valueLine.split(" ").firstOrNull()
+                    valueLine?.let { TextEntity(label = simplifiedTag, text = it) }
+                        ?.let { entities.add(it) }
                 }
             }
         }
 
         return entities
     }
-
 
     private fun formatTextWithBoundingBoxes(result: com.google.mlkit.vision.text.Text): String {
         val tolerance = 15  // Tolerance for grouping lines into rows
@@ -270,7 +281,7 @@ class Extraction<Text>(private val context: Context) {
             Regex("\\b\\d{2}[\\/-]\\d{2}[\\/-]\\d{4}\\b") // Matches dates in DD/MM/YYYY or DD-MM-YYYY
         val amountRegex = Regex("\\b\\d+\\.\\d{2}\\b") // Matches amounts with two decimal places
         val gstTaxRegex = Regex("\\b[0-9A-Z]{15}\\b") // Matches GSTIN format
-        val invoiceRegex = Regex("\\b\\d{4,}\\b") // Matches invoices with 4+ digits
+        val invoiceRegex = Regex("\\b\\d{1,8}\\b") // Matches invoices with 4+ digits
         val customerRegex = Regex("\\b[A-Z][a-z]+\\b") // Matches capitalized words
         val quantityRegex = Regex("\\b\\d{1,2}\\b") // Matches quantities of 1-2 digits
 
