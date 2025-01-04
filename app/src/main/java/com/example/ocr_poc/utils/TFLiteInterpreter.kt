@@ -9,29 +9,12 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class TFLiteInterpreter(context: Context, modelPath: String) {
-    // Load TensorFlow Lite model
-    private val interpreter: Interpreter = try {
-        val assetFileDescriptor = context.assets.openFd(modelPath)
-        val inputStream = assetFileDescriptor.createInputStream()
-        val mappedByteBuffer = inputStream.channel.map(
-            java.nio.channels.FileChannel.MapMode.READ_ONLY,
-            assetFileDescriptor.startOffset,
-            assetFileDescriptor.declaredLength
-        )
-        Interpreter(mappedByteBuffer).also {
-            Log.d("TFLiteInterpreter", "Model loaded successfully.")
-        }
-    } catch (e: FileNotFoundException) {
-        Log.e("TFLiteInterpreter", "Model file not found: $modelPath", e)
-        throw RuntimeException("Model file not found: $modelPath")
-    } catch (e: IOException) {
-        Log.e("TFLiteInterpreter", "Error loading model: ${e.message}", e)
-        throw RuntimeException("Error loading model: ${e.message}")
-    }
+    private val interpreter: Interpreter
     private val inputShape: IntArray
     private val outputShape: IntArray
 
     init {
+        interpreter = loadModel(context, modelPath)
 
         // Retrieve input/output shapes
         try {
@@ -53,6 +36,27 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
         }
     }
 
+    private fun loadModel(context: Context, modelPath: String): Interpreter {
+        return try {
+            val assetFileDescriptor = context.assets.openFd(modelPath)
+            val inputStream = assetFileDescriptor.createInputStream()
+            val mappedByteBuffer = inputStream.channel.map(
+                java.nio.channels.FileChannel.MapMode.READ_ONLY,
+                assetFileDescriptor.startOffset,
+                assetFileDescriptor.declaredLength
+            )
+            Interpreter(mappedByteBuffer).also {
+                Log.d("TFLiteInterpreter", "Model loaded successfully.")
+            }
+        } catch (e: FileNotFoundException) {
+            Log.e("TFLiteInterpreter", "Model file not found: $modelPath", e)
+            throw RuntimeException("Model file not found: $modelPath")
+        } catch (e: IOException) {
+            Log.e("TFLiteInterpreter", "Error loading model: ${e.message}", e)
+            throw RuntimeException("Error loading model: ${e.message}")
+        }
+    }
+
     fun predict(
         text: String,
         word2index: Map<String, Int>,
@@ -60,7 +64,6 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
     ): Array<Pair<String, String>> {
         Log.d("TFLiteInterpreter", "Starting prediction...")
 
-        // Preprocess input text
         val (tokens, inputTensor) = preprocessText(text, word2index)
 
         if (inputTensor.size != inputShape[1]) {
@@ -91,8 +94,8 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
         return predictions.filter { (token, tag) ->
             when (tag) {
                 "B-TOTAL", "I-TOTAL", "B-PRICE", "I-PRICE", "B-QUANTITY", "I-QUANTITY" -> token.isNumeric()
-                "B-NAME", "I-NAME" -> token.isName() // Add a custom check for names if needed
-                else -> true // Allow other tags without validation
+                "B-NAME", "I-NAME" -> token.isName()
+                else -> true
             }
         }.toTypedArray()
     }
@@ -102,7 +105,6 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
     }
 
     private fun String.isName(): Boolean {
-        // Simple heuristic: Names are usually alphabetic and start with an uppercase letter
         return this.matches(Regex("^[A-Z][a-zA-Z]+$"))
     }
 
@@ -151,3 +153,40 @@ class TFLiteInterpreter(context: Context, modelPath: String) {
         Log.d("TFLiteInterpreter", "Interpreter closed.")
     }
 }
+
+
+//    Differences
+//    Model Loading
+//    Python:
+//    Uses tf.lite.Interpreter and allocates tensors directly.
+//    Android:
+//    Maps the model file to a ByteBuffer using the file system and initializes the Interpreter.
+//    Input Processing
+//    Python:
+//    Uses pad_sequences from Keras to handle padding/truncation.
+//    Directly works with NumPy arrays and TensorFlow utilities.
+//    Android:
+//    Performs padding/truncation manually by creating and manipulating lists.
+//    Converts data to a ByteBuffer format, which is required for TensorFlow Lite inference on Android.
+//    Inference Execution
+//    Python:
+//    Inference is a single call using interpreter.invoke() after setting the input tensor.
+//    Android:
+//    Uses the Interpreter.run() method with ByteBuffer input and output.
+//    Post-Processing
+//    Python:
+//    Uses NumPy to handle tensors and process class probabilities (np.argmax).
+//    Android:
+//    Iterates over a ByteBuffer and computes the class with the highest probability manually.
+//    Validation Logic
+//    Android Only:
+//    Includes validation checks for predictions based on specific tags (e.g., numeric validation for "B-TOTAL").
+//    Python implementation does not include this additional layer of validation.
+//    Error Handling
+//    Android:
+//    Includes explicit exception handling (FileNotFoundException, IOException) and logs errors using Log.e.
+//    Python:
+//    Relies on TensorFlow Lite's internal exception handling and raises errors directly.
+//    Key Difference
+//    Android's validatePredictions Function:
+//    This is a unique feature in the Android implementation. It filters predictions based on domain-specific rules (e.g., checking if tokens for "B-TOTAL" are numeric). This kind of validation is absent in the Python implementation.

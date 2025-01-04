@@ -29,30 +29,52 @@ import kotlin.math.abs
 
 class Extraction<Text>(private val context: Context) {
     private val validTags = listOf(
+        "--PADDING--",
         "O",
-        "B-INVOICE", "I-INVOICE",
-        "B-DATE", "I-DATE",
-        "B-PO", "I-PO",
-        "B-VENDOR", "I-VENDOR",
-        "B-CUSTOMER", "I-CUSTOMER",
-        "B-ADDRESS", "I-ADDRESS",
-        "B-PHONE", "I-PHONE",
-        "B-EMAIL", "I-EMAIL",
-        "B-WEBSITE", "I-WEBSITE",
-        "B-ITEM", "I-ITEM",
-        "B-QUANTITY", "I-QUANTITY",
-        "B-PRICE", "I-PRICE",
-        "B-SUBTOTAL", "I-SUBTOTAL",
-        "B-TAX", "I-TAX",
-        "B-TOTAL", "I-TOTAL",
-        "B-PAYMENT", "I-PAYMENT",
-        "B-BANK", "I-BANK",
-        "B-NOTES", "I-NOTES",
-        "B-GST", "I-GST",
-        "B-TAX-COMPONENT", "I-TAX-COMPONENT"
+        "B-INVOICE",
+        "I-INVOICE",
+        "B-DATE",
+        "I-DATE",
+        "B-PO",
+        "I-PO",
+        "B-VENDOR",
+        "I-VENDOR",
+        "B-CUSTOMER",
+        "I-CUSTOMER",
+        "B-ADDRESS",
+        "I-ADDRESS",
+        "B-PHONE",
+        "I-PHONE",
+        "B-EMAIL",
+        "I-EMAIL",
+        "B-WEBSITE",
+        "I-WEBSITE",
+        "B-ITEM",
+        "I-ITEM",
+        "B-QUANTITY",
+        "I-QUANTITY",
+        "B-PRICE",
+        "I-PRICE",
+        "B-SUBTOTAL",
+        "I-SUBTOTAL",
+        "B-TAX",
+        "I-TAX",
+        "B-TOTAL",
+        "I-TOTAL",
+        "B-PAYMENT",
+        "I-PAYMENT",
+        "B-BANK",
+        "I-BANK",
+        "B-NOTES",
+        "I-NOTES",
+        "B-GST",
+        "I-GST",
+        "B-TAX-COMPONENT",
+        "I-TAX-COMPONENT"
     )
 
     private val index2tag = validTags.mapIndexed { index, tag -> index to tag }.toMap()
+
 
     @Throws(java.lang.Exception::class)
     private fun loadHighResBitmap(uri: Uri): Bitmap? {
@@ -129,11 +151,11 @@ class Extraction<Text>(private val context: Context) {
 
                     val extractedEntities = mutableListOf<TextEntity>()
                     val mlkitEntities = extractMLKitEntities(formattedText)
+                    Log.d("MLKit Entities", mlkitEntities.joinToString("\n"))
                     extractedEntities.addAll(mlkitEntities)
                     val bilstmPredictions =
                         runBiLSTMPredictions(formattedText, tfliteInterpreter, word2index)
-
-
+                    Log.d("BiLSTM Predictions", bilstmPredictions.joinToString("\n"))
                     for ((token, tag) in bilstmPredictions) {
                         if (tag != "O") {
                             extractedEntities.add(TextEntity(label = tag, text = token))
@@ -258,7 +280,7 @@ class Extraction<Text>(private val context: Context) {
                 "EMAIL" -> emailRegex.findAll(entity.text).joinToString(", ") { it.value }
                 "PHONE" -> phoneRegex.findAll(entity.text).joinToString(", ") { it.value }
                 "DATE" -> dateRegex.findAll(entity.text).joinToString(", ") { it.value }
-                "TOTAL", "SUBTOTAL" -> amountRegex.findAll(entity.text)
+                "TOTAL", "SUBTOTAL", "PRICE" -> amountRegex.findAll(entity.text)
                     .joinToString(", ") { it.value }
 
                 "TAX", "GST", "GSTIN" -> gstTaxRegex.findAll(entity.text)
@@ -266,7 +288,7 @@ class Extraction<Text>(private val context: Context) {
 
                 "INVOICE" -> invoiceRegex.findAll(entity.text).joinToString(", ") { it.value }
                 "CUSTOMER", "VENDOR" -> customerRegex.findAll(entity.text)
-                    .joinToString(", ") { it.value }
+                    .joinToString(" ") { it.value }
 
                 "QUANTITY" -> quantityRegex.findAll(entity.text).joinToString(", ") { it.value }
                 else -> entity.text // Fallback: Use original text

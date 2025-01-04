@@ -106,4 +106,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation (libs.common)
     implementation(libs.firebase.analytics)
+
+    // Numpy similar library
+    implementation(libs.multik.core)
+
 }
