@@ -28,53 +28,36 @@ import kotlin.math.abs
 
 
 class Extraction<Text>(private val context: Context) {
-    private val validTags = listOf(
-        "--PADDING--",
-        "O",
-        "B-INVOICE",
-        "I-INVOICE",
-        "B-DATE",
-        "I-DATE",
-        "B-PO",
-        "I-PO",
-        "B-VENDOR",
-        "I-VENDOR",
-        "B-CUSTOMER",
-        "I-CUSTOMER",
-        "B-ADDRESS",
-        "I-ADDRESS",
-        "B-PHONE",
-        "I-PHONE",
-        "B-EMAIL",
-        "I-EMAIL",
-        "B-WEBSITE",
-        "I-WEBSITE",
-        "B-ITEM",
-        "I-ITEM",
-        "B-QUANTITY",
-        "I-QUANTITY",
-        "B-PRICE",
-        "I-PRICE",
-        "B-SUBTOTAL",
-        "I-SUBTOTAL",
-        "B-TAX",
-        "I-TAX",
-        "B-TOTAL",
-        "I-TOTAL",
-        "B-PAYMENT",
-        "I-PAYMENT",
-        "B-BANK",
-        "I-BANK",
-        "B-NOTES",
-        "I-NOTES",
-        "B-GST",
-        "I-GST",
-        "B-TAX-COMPONENT",
-        "I-TAX-COMPONENT"
+    val index2tag = mapOf(
+        0 to "--PADDING--",
+        1 to "O",
+        2 to "B-INVOICE",
+        3 to "I-INVOICE",
+        4 to "B-PAN",
+        5 to "I-PAN",
+        6 to "B-VENDOR",
+        7 to "I-VENDOR",
+        8 to "B-CUSTOMER",
+        9 to "I-CUSTOMER",
+        10 to "B-PHONE",
+        11 to "I-PHONE",
+        12 to "B-EMAIL",
+        13 to "I-EMAIL",
+        14 to "B-ITEM",
+        15 to "I-ITEM",
+        16 to "B-QUANTITY",
+        17 to "I-QUANTITY",
+        18 to "B-PRICE",
+        19 to "I-PRICE",
+        20 to "B-SUBTOTAL",
+        21 to "I-SUBTOTAL",
+        22 to "B-TAX",
+        23 to "I-TAX",
+        24 to "B-TOTAL",
+        25 to "I-TOTAL",
+        26 to "B-GST",
+        27 to "I-GST"
     )
-
-    private val index2tag = validTags.mapIndexed { index, tag -> index to tag }.toMap()
-
 
     @Throws(java.lang.Exception::class)
     private fun loadHighResBitmap(uri: Uri): Bitmap? {
@@ -174,8 +157,10 @@ class Extraction<Text>(private val context: Context) {
                     extractedEntities.addAll(proximityEntities)
 
                     val combined = combineEntitiesByTag(extractedEntities)
+                    val regexCorrectedEntities = applyRegexCorrections(combined)
 
-                    return@withContext applyRegexCorrections(combined)
+                    val uniqueEntities = getUniqueEntities(regexCorrectedEntities)
+                    return@withContext uniqueEntities
 
                 } catch (e: Exception) {
                     Log.e("MLKit OCR", "Text recognition failed: ${e.message}")
@@ -185,6 +170,23 @@ class Extraction<Text>(private val context: Context) {
                 Log.e("MLKit OCR", "Failed to load bitmap")
                 emptyList()
             }
+        }
+    }
+
+    private fun getUniqueEntities(entities: List<TextEntity>): List<TextEntity> {
+        val uniqueEntities = mutableMapOf<String, MutableSet<String>>()
+
+        entities.forEach { entity ->
+            val label = entity.label
+            val texts = entity.text.split(", ").map { it.trim() }
+            if (label !in uniqueEntities) {
+                uniqueEntities[label] = mutableSetOf()
+            }
+            uniqueEntities[label]?.addAll(texts)
+        }
+
+        return uniqueEntities.map { (label, texts) ->
+            TextEntity(label = label, text = texts.joinToString(", "))
         }
     }
 
@@ -397,7 +399,7 @@ class Extraction<Text>(private val context: Context) {
     private fun getEntityTypeName(entity: Entity): String {
         return when (entity.type) {
             Entity.TYPE_ADDRESS -> "ADDRESS"
-            Entity.TYPE_DATE_TIME -> "DATE_TIME"
+            Entity.TYPE_DATE_TIME -> "DATE"
             Entity.TYPE_EMAIL -> "EMAIL"
             Entity.TYPE_FLIGHT_NUMBER -> "FLIGHT_NUMBER"
             Entity.TYPE_IBAN -> "IBAN"
